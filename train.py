@@ -15,7 +15,7 @@ def generator(path):
         print('loop generator')
         for file in files:
             try:
-                df = pyreadr.read_r(file)[None].to_numpy()
+                df = pyreadr.read_r(file)[None].to_numpy() #test
                 batches = int(np.ceil(len(df)/batch_size))
                 for i in range(batches):
                     yield df[i*batch_size:min(len(df), i*batch_size+batch_size)]
