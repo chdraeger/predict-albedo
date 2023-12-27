@@ -17,6 +17,21 @@ class dataloader(Sequence):
         self.shuffle = shuffle
         self.to_fit = to_fit
         self.filenames = self.get_all_files(path, shuffle)
+        self.samples_pr_file = [9,16,9,]
+        [2,3,2]
+        self.sample_indices_pr_batch = []
+        self.same_as_last_file = False
+        self.last_file_read = None
+        for n in self.samples_pr_file:
+            indices = np.arange(n)
+            if shuffle:
+                np.random.shuffle(indieces)
+            while True:
+
+
+            if shuffle:
+
+        self.sample_indices_pr_batch = [[0,1,2,3,4,5],[6,7,8],[]]
 
     def __len__(self):
         'Denotes the number of batches per epoch'
@@ -29,14 +44,21 @@ class dataloader(Sequence):
             np.random.shuffle(filenames)
         return filenames
 
-    def __getitem__(self, index): # index: length of sequence
+    def __getitem__(self, index): # index: length of sequence --> total number of samples / batch_size
         'Generate one batch of data'
         file = self.filenames[index]
-        data = pyreadr.read_r(file)[None].to_numpy()
+        if file == self.last_file_read:
+            data = self.data
+        else:
+            data = pyreadr.read_r(file)[None].to_numpy()
+            if self.transform:
+                std = np.genfromtxt(self.transform_file, dtype=float, delimiter=',', names=True)
+                data = (data - std['mean']) / std['sd']
+            self.data = data
+            self.last_file_read = file
 
-        if self.transform:
-            std = np.genfromtxt(self.transform_file, dtype=float, delimiter=',', names=True)
-            data = (data - std['mean']) / std['sd']
+
+
 
         X = data[:, :-1]
 
