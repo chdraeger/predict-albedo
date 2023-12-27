@@ -23,7 +23,7 @@ def generator(path):
             except EOFError:
                 print("error" + file)
 
-
+#
 # prepare input data
 class christinas_dataloader:
     def __init__(self,path,transform,batch_size):
