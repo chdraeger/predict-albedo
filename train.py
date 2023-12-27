@@ -9,24 +9,28 @@ import numpy as np
 import pyreadr
 
 class dataloader(Sequence):
-    def __init__(self, path, batch_size, transform=None, transform_file=None, shuffle=None):
+    def __init__(self, path, batch_size, transform=False, transform_file=None, shuffle=False, to_fit=True):
         self.path = path
         self.batch_size = batch_size
-        self.shuffle = shuffle
         self.transform = transform
         self.transform_file = transform_file
-        self.filenames = self.get_all_files_in_path(path, shuffle)
+        self.shuffle = shuffle
+        self.to_fit = to_fit
+        self.filenames = self.get_all_files(path, shuffle)
 
     def __len__(self):
-        return int(np.ceil(len(self.filenames) / float(self.batch_size))) # total number of batches in the full dataset
+        'Denotes the number of batches per epoch'
+        return int(np.ceil(len(self.filenames) / float(self.batch_size)))
 
-    def get_all_files_in_path(self, path, shuffle):
+    def get_all_files(self, path, shuffle):
+        'Get all files in path'
         filenames = glob.glob(path + '*' + '.RDS')
         if shuffle:
             np.random.shuffle(filenames)
         return filenames
 
-    def __getitem__(self, index): # length of sequence
+    def __getitem__(self, index): # index: length of sequence
+        'Generate one batch of data'
         file = self.filenames[index]
         data = pyreadr.read_r(file)[None].to_numpy()
 
@@ -34,12 +38,16 @@ class dataloader(Sequence):
             std = np.genfromtxt(self.transform_file, dtype=float, delimiter=',', names=True)
             data = (data - std['mean']) / std['sd']
 
-        x = data[:, :-1]
-        y = data[:, -1]
-        return x, y
+        X = data[:, :-1]
+
+        if self.to_fit:
+            y = data[:, -1]
+            return X, y
+        else:
+            return X
 
 
-# define and build a Sequential model, and print a summary
+# define and build a Sequential model
 def build_model():
     model = Sequential()
     model.add(layers.Dense(2**8, input_shape=(22,), activation='relu'))
@@ -55,15 +63,17 @@ if __name__ == "__main__":
     # specifications
     epochs = 10 # 30
     batch_size = 40000 # 2**7
-    path_train = 'data/train/'
-    path_validate = 'data/validate/'
     transform_file = 'data/meta/std.csv'
 
     # get data
-    train_generator = dataloader(path_train, batch_size, transform=True, transform_file=transform_file, shuffle=True)
-    validate_generator = dataloader(path_validate, batch_size, transform=True, transform_file=transform_file)
+    train_gen = dataloader('data/train/', batch_size,
+                                 transform=True, transform_file=transform_file, shuffle=True)
+    validate_gen = dataloader('data/validate/', batch_size,
+                                    transform=True, transform_file=transform_file)
+    test_gen = dataloader('data/test/', batch_size,
+                                transform=True, transform_file=transform_file, to_fit=True)
 
-    # model
+    # fit model
     model = build_model()
     build_model().summary()
 
@@ -71,13 +81,17 @@ if __name__ == "__main__":
                  CSVLogger('output/history.csv')]
 
     fitted_model = model.fit(
-        train_generator,
-        validation_data=validate_generator,
+        train_gen,
+        validation_data=validate_gen,
         epochs=epochs,
         callbacks=callbacks
     )
 
-    # plot
+    # plot training + validation
     plt = pd.DataFrame(fitted_model.history).plot(figsize=(8, 5))
     fig = plt.get_figure()
     fig.savefig("output/model.png")
+
+    # predict on test set
+    prediction = model.evaluate(test_gen)
+    print("test loss, test mae:", prediction)
