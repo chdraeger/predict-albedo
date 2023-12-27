@@ -1,55 +1,59 @@
-#from tensorflow.keras.models import Sequential
-#from tensorflow.keras import layers
-#from tensorflow.keras.callbacks import ModelCheckpoint
-#from tensorflow.keras.callbacks import CSVLogger
-from os import listdir
+from tensorflow.keras.models import Sequential
+from tensorflow.keras import layers
+from tensorflow.keras.callbacks import ModelCheckpoint
+from tensorflow.keras.callbacks import CSVLogger
+import tensorflow as tf
+import glob
 import pandas as pd
 import numpy as np
 import pyreadr
 
 
-def generator(path):
-    print('start generator')
-    files = [path + str(s) for s in listdir(path)]
-    while True:
-        print('loop generator')
-        for file in files:
-            try:
-                df = pyreadr.read_r(file)[None].to_numpy() #test
-                batches = int(np.ceil(len(df)/batch_size))
-                for i in range(batches):
-                    yield df[i*batch_size:min(len(df), i*batch_size+batch_size)]
-
-            except EOFError:
-                print("error" + file)
-
+# def generator(path, batch_size):
+#     print('start generator')
+#     files = glob.glob(path + '*' + '.RDS')
+#     for file in files:
+#         print('file', file)
+#         try:
+#             df = pyreadr.read_r(file)[None].to_numpy()
+#             batches = int(np.ceil(len(df)/batch_size))
+#             for i in range(batches):
+#                 df_chunk = df[i*batch_size:min(len(df), i*batch_size+batch_size)]
+#                 x = df_chunk[:, :-1]
+#                 y = df_chunk[:, -1]
+#                 yield x, y
 #
+#         except EOFError:
+#             print("error" + file)
+
+
 # prepare input data
-class christinas_dataloader:
-    def __init__(self,path,transform,batch_size):
+class dataloader(tf.keras.utils.Sequence):
+    def __init__(self,path,batch_size,shuffle=None,transform=None):
         self.path = path
-        self.transform = transform
         self.batch_size = batch_size
-        #self.get_all_files_in_path(path)
-
-    def get_all_files_in_path(self,path):
-        glob(path)
-        self.files = files # loc files
-        return
-
-    def __getitem__(self, index): # right now: files number
-        file = self.files[index]
-#        with file open as f:
-#            data = np.load(file)
-        return data
+        self.shuffle = shuffle
+        self.transform = transform
+        self.filenames = self.get_all_files_in_path(path)
 
     def __len__(self):
-        return self.n
+        return int(np.ceil(len(self.filenames) / float(self.batch_size))) # total number of batches in the full dataset
+
+    def get_all_files_in_path(self,path):
+        # filenames =
+        # np.random.shuffle(train_file_names)
+        return glob.glob(path + '*' + '.RDS')
+
+    def __getitem__(self, index): # length of sequence
+        file = self.filenames[index]
+        data = pyreadr.read_r(file)[None].to_numpy()
+        x = data[:, :-1]
+        y = data[:, -1]
+        return x, y
 
 
 
 def create_dataset():
-
     list_train = ['data/train/' + str(s) for s in listdir('data/train/')]
 
     data_tr = pyreadr.read_r(list_train[0])[None].to_numpy()
@@ -58,7 +62,6 @@ def create_dataset():
     mean = np.loadtxt("data/meta/mean_all.txt", dtype=float)
     std = np.loadtxt("data/meta/std_all.txt", dtype=float)
     data_tr_std = (data_tr - mean) / std
-    data_tr_std[0:20]
     x = data_tr_std[:, :-1]
     y = data_tr_std[:, -1]
     return x, y
@@ -105,32 +108,41 @@ def fit_model(epochs, batch_size, validation_split):
 
 if __name__ == "__main__":
     # specifications
-    epochs = 30
-    batch_size = 2**7
-    validation_split = 0.1
+    epochs = 2 # 30
+    batch_size = 40000 # 2**7
+    path_train = 'data/test1/'
 
-    path_train = 'data/train/'
-    data_generator = generator(path_train)
-    for i, data in enumerate(data_generator):
+    # get data
+    train_generator = dataloader(path_train, batch_size)
+    #transform = None
+    for i, data in enumerate(train_generator):
         print(i)
 
     # fit_model(epochs, batch_size, validation_split)
-    #transform = ?
-    transform = None
+    model = build_model()
+    build_model().summary()
 
-    dataloader_train = christinas_dataloader(path_train,transform,batch_size)
-    for i in range(len(dataloader_train)):
-        data_file = dataloader_train.__getitem__(i)
+    fitted_model = model.fit(
+        train_generator,
+        validation_data=train_generator,
+        epochs=epochs
+    )
 
-    for data_file in dataloader_train:
-        niter = len(data_file)/dataloader_train.batch_size
-        for i in range(niter):
-            data = data_file[i*batch_size:(i+1)*batch_size]
-            input_data, output_data = data
-            output_prediction = model(input_data)
-            loss = loss_fn(output_data,output_prediction)
-            model.backward()
+    print('here')
 
-    dataloader_train.get_all_files_in_path()
-    dataloader_train.__len__()
-    len(dataloader_train)
+    # dataloader_train = christinas_dataloader(path_train,transform,batch_size)
+    # for i in range(len(dataloader_train)):
+    #     data_file = dataloader_train.__getitem__(i)
+    #
+    # for data_file in dataloader_train:
+    #     niter = len(data_file)/dataloader_train.batch_size
+    #     for i in range(niter):
+    #         data = data_file[i*batch_size:(i+1)*batch_size]
+    #         input_data, output_data = data
+    #         output_prediction = model(input_data)
+    #         loss = loss_fn(output_data,output_prediction)
+    #         model.backward()
+
+    # dataloader_train.get_all_files_in_path()
+    # dataloader_train.__len__()
+    # len(dataloader_train)
