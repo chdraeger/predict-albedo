@@ -1,39 +1,20 @@
+from tensorflow.keras.utils import Sequence
 from tensorflow.keras.models import Sequential
 from tensorflow.keras import layers
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.callbacks import CSVLogger
-import tensorflow as tf
 import glob
 import pandas as pd
 import numpy as np
 import pyreadr
 
-
-# def generator(path, batch_size):
-#     print('start generator')
-#     files = glob.glob(path + '*' + '.RDS')
-#     for file in files:
-#         print('file', file)
-#         try:
-#             df = pyreadr.read_r(file)[None].to_numpy()
-#             batches = int(np.ceil(len(df)/batch_size))
-#             for i in range(batches):
-#                 df_chunk = df[i*batch_size:min(len(df), i*batch_size+batch_size)]
-#                 x = df_chunk[:, :-1]
-#                 y = df_chunk[:, -1]
-#                 yield x, y
-#
-#         except EOFError:
-#             print("error" + file)
-
-
-# prepare input data
-class dataloader(tf.keras.utils.Sequence):
-    def __init__(self,path,batch_size,shuffle=None,transform=None):
+class dataloader(Sequence):
+    def __init__(self, path, batch_size, shuffle=None, transform=None, transform_file=None):
         self.path = path
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.transform = transform
+        self.transform_file = transform_file
         self.filenames = self.get_all_files_in_path(path)
 
     def __len__(self):
@@ -47,24 +28,15 @@ class dataloader(tf.keras.utils.Sequence):
     def __getitem__(self, index): # length of sequence
         file = self.filenames[index]
         data = pyreadr.read_r(file)[None].to_numpy()
+
+        if self.transform:
+            std = np.genfromtxt(self.transform_file, dtype=float, delimiter=',', names=True)
+            data = (data - std['mean']) / std['sd']
+
         x = data[:, :-1]
         y = data[:, -1]
         return x, y
 
-
-
-def create_dataset():
-    list_train = ['data/train/' + str(s) for s in listdir('data/train/')]
-
-    data_tr = pyreadr.read_r(list_train[0])[None].to_numpy()
-
-    # standardize
-    mean = np.loadtxt("data/meta/mean_all.txt", dtype=float)
-    std = np.loadtxt("data/meta/std_all.txt", dtype=float)
-    data_tr_std = (data_tr - mean) / std
-    x = data_tr_std[:, :-1]
-    y = data_tr_std[:, -1]
-    return x, y
 
 # define and build a Sequential model, and print a summary
 def build_model():
@@ -113,8 +85,7 @@ if __name__ == "__main__":
     path_train = 'data/test1/'
 
     # get data
-    train_generator = dataloader(path_train, batch_size)
-    #transform = None
+    train_generator = dataloader(path_train, batch_size, transform=True, transform_file='data/meta/std.csv')
     for i, data in enumerate(train_generator):
         print(i)
 
