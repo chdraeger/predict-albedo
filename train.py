@@ -6,6 +6,7 @@ from tensorflow.keras.callbacks import CSVLogger
 import glob
 import pandas as pd
 import numpy as np
+from pathlib import Path
 
 class dataloader(Sequence):
     """
@@ -16,7 +17,9 @@ class dataloader(Sequence):
         batch_size: Size of the batch
     """
     def __init__(self, path, batch_size, shuffle=False, to_fit=True, standardize=False, standardize_file=None, transform=False):
-        'Initialize'
+        """
+        Initialize
+        """
         self.path = path
         self.batch_size = batch_size
         self.shuffle = shuffle
@@ -30,6 +33,7 @@ class dataloader(Sequence):
         self._batch_file = []
         self._batch_indices_pr_file = []
 
+        # get lists of length [nr of batches] with the file name and the relevant indices per batch
         count = 0
         filepaths = self.get_all_files(path, shuffle)
         for file in filepaths:
@@ -47,18 +51,28 @@ class dataloader(Sequence):
         self.no_samples = count
 
     def __len__(self):
-        'Denote the number of batches per epoch'
+        """
+        Denote the number of batches per epoch
+        """
         return len(self._batch_indices_pr_file)
 
     def get_all_files(self, path, shuffle):
-        'Get all files in path'
+        """
+        Get all files in path
+
+        :param path:
+        :param shuffle:
+        :return:
+        """
         filenames = glob.glob(path + '*' + '.npz')
         if shuffle:
             np.random.shuffle(filenames)
         return filenames
 
     def __getitem__(self, idx):
-        'Generate one batch of data'
+        """
+        Generate one batch of data
+        """
 
         file = self._batch_file[idx]
         if file == self.last_file_read:
@@ -85,34 +99,47 @@ class dataloader(Sequence):
 
 
 # define and build a Sequential model
-def build_model():
-    model = Sequential()
-    model.add(layers.Dense(2**8, input_shape=(22,), activation='relu'))
-    model.add(layers.Dropout(0.2))
-    model.add(layers.Dense(2**7, activation='relu'))
-    model.add(layers.Dropout(0.1))
-    model.add(layers.Dense(1, activation=None))
-    model.compile(loss='mse', optimizer='adam', metrics=['mae'])
+def build_model(model_type = 'fnn'):
+
+    match model_type:
+        case 'fnn':
+            model = Sequential()
+            model.add(layers.Dense(2 ** 8, input_shape=(22,), activation='relu'))
+            model.add(layers.Dropout(0.2))
+            model.add(layers.Dense(2 ** 7, activation='relu'))
+            model.add(layers.Dropout(0.1))
+            model.add(layers.Dense(1, activation=None))
+            model.compile(loss='mse', optimizer='adam', metrics=['mae'])
+        case 'lstm':
+            model = Sequential()
+        case 'resnet':
+            model = Sequential()
+
     return model
 
 
 if __name__ == "__main__":
     # specifications
-    epochs = 10 # 30
+    epochs = 2 # 30
     batch_size = 40000 # 2**7
     standardize_file = 'data/meta/std.csv'
+    transform = False
+    model_type = 'fnn'
 
-    # get data
-    train_gen = dataloader('data/train/', batch_size, standardize=True, standardize_file=standardize_file, shuffle=True)
-    validate_gen = dataloader('data/validate/', batch_size, standardize=True, standardize_file=standardize_file)
-    test_gen = dataloader('data/test/', batch_size, standardize=True, standardize_file=standardize_file)
+    print('Initiate data generators \n')
+    train_gen = dataloader('data/train1/', batch_size, standardize=True, standardize_file=standardize_file, transform=transform, shuffle=True)
+    validate_gen = dataloader('data/validate1/', batch_size, standardize=True, standardize_file=standardize_file, transform=transform)
+    test_gen = dataloader('data/test1/', batch_size, standardize=True, standardize_file=standardize_file, transform=transform)
 
-    # fit model
-    model = build_model()
+    print('Fit model \n')
+    model = build_model(model_type=model_type)
     build_model().summary()
 
-    callbacks = [ModelCheckpoint(filepath='output/model.hdf5', save_best_only=True),
-                 CSVLogger('output/history.csv')]
+    # checkpoints
+    output_path = 'output_' + model_type + '/'
+    Path(output_path).mkdir(parents=True, exist_ok=True)
+    callbacks = [ModelCheckpoint(filepath=output_path + 'model.keras', save_best_only=True),
+                 CSVLogger(output_path + 'history.csv')]
 
     fitted_model = model.fit(
         train_gen,
@@ -121,11 +148,11 @@ if __name__ == "__main__":
         callbacks=callbacks
     )
 
-    # plot training + validation
+    print('Plot training and validation \n')
     plt = pd.DataFrame(fitted_model.history).plot(figsize=(8, 5))
     fig = plt.get_figure()
-    fig.savefig("output/model.png")
+    fig.savefig(output_path + "loss_train_val.png")
 
-    # predict on test set
+    print('Predict on test set \n')
     prediction = model.evaluate(test_gen)
-    print("test loss, test mae:", prediction)
+    np.savetxt(output_path + 'loss_test.txt', prediction, header="test_loss,test_mae")
