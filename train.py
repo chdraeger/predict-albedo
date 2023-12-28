@@ -6,61 +6,76 @@ from tensorflow.keras.callbacks import CSVLogger
 import glob
 import pandas as pd
 import numpy as np
-import pyreadr
 
 class dataloader(Sequence):
-    def __init__(self, path, batch_size, transform=False, transform_file=None, shuffle=False, to_fit=True):
+    """
+    Generate data for each batch
+
+    Attributes:
+        path: Name of the directory containing the data files
+        batch_size: Size of the batch
+    """
+    def __init__(self, path, batch_size, shuffle=False, to_fit=True, standardize=False, standardize_file=None, transform=False):
+        'Initialize'
         self.path = path
         self.batch_size = batch_size
-        self.transform = transform
-        self.transform_file = transform_file
         self.shuffle = shuffle
         self.to_fit = to_fit
-        self.filenames = self.get_all_files(path, shuffle)
-        self.samples_pr_file = [9,16,9,]
-        [2,3,2]
-        self.sample_indices_pr_batch = []
-        self.same_as_last_file = False
+        self.standardize = standardize
+        self.standardize_file = standardize_file
+        self.transform = transform
+        self.data = None
         self.last_file_read = None
-        for n in self.samples_pr_file:
-            indices = np.arange(n)
+        self.samples_pr_file = dict()
+        self._batch_file = []
+        self._batch_indices_pr_file = []
+
+        count = 0
+        filepaths = self.get_all_files(path, shuffle)
+        for file in filepaths:
+            data = np.load(file)['data']
+            size = len(data)
+            self.samples_pr_file[file] = size
+
+            indices = np.arange(size)
             if shuffle:
-                np.random.shuffle(indieces)
-            while True:
-
-
-            if shuffle:
-
-        self.sample_indices_pr_batch = [[0,1,2,3,4,5],[6,7,8],[]]
+                np.random.shuffle(indices)
+            indices_chunk = [indices[x:x+self.batch_size] for x in range(0, len(indices), self.batch_size)]
+            self._batch_file += [file] * int(np.ceil(size/batch_size))
+            self._batch_indices_pr_file += indices_chunk
+            count += size
+        self.no_samples = count
 
     def __len__(self):
-        'Denotes the number of batches per epoch'
-        return int(np.ceil(len(self.filenames) / float(self.batch_size)))
+        'Denote the number of batches per epoch'
+        return len(self._batch_indices_pr_file)
 
     def get_all_files(self, path, shuffle):
         'Get all files in path'
-        filenames = glob.glob(path + '*' + '.RDS')
+        filenames = glob.glob(path + '*' + '.npz')
         if shuffle:
             np.random.shuffle(filenames)
         return filenames
 
-    def __getitem__(self, index): # index: length of sequence --> total number of samples / batch_size
+    def __getitem__(self, idx):
         'Generate one batch of data'
-        file = self.filenames[index]
+
+        file = self._batch_file[idx]
         if file == self.last_file_read:
             data = self.data
         else:
-            data = pyreadr.read_r(file)[None].to_numpy()
-            if self.transform:
-                std = np.genfromtxt(self.transform_file, dtype=float, delimiter=',', names=True)
+            data = np.load(file)['data']
+            if self.standardize:
+                std = np.genfromtxt(self.standardize_file, dtype=float, delimiter=',', names=True)
                 data = (data - std['mean']) / std['sd']
             self.data = data
             self.last_file_read = file
 
-
-
-
         X = data[:, :-1]
+
+        # transform to 3-dimensional input (for convolution)
+        if self.transform:
+            X = X
 
         if self.to_fit:
             y = data[:, -1]
@@ -85,15 +100,12 @@ if __name__ == "__main__":
     # specifications
     epochs = 10 # 30
     batch_size = 40000 # 2**7
-    transform_file = 'data/meta/std.csv'
+    standardize_file = 'data/meta/std.csv'
 
     # get data
-    train_gen = dataloader('data/train/', batch_size,
-                                 transform=True, transform_file=transform_file, shuffle=True)
-    validate_gen = dataloader('data/validate/', batch_size,
-                                    transform=True, transform_file=transform_file)
-    test_gen = dataloader('data/test/', batch_size,
-                                transform=True, transform_file=transform_file, to_fit=True)
+    train_gen = dataloader('data/train/', batch_size, standardize=True, standardize_file=standardize_file, shuffle=True)
+    validate_gen = dataloader('data/validate/', batch_size, standardize=True, standardize_file=standardize_file)
+    test_gen = dataloader('data/test/', batch_size, standardize=True, standardize_file=standardize_file)
 
     # fit model
     model = build_model()
