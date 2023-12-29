@@ -85,11 +85,21 @@ class dataloader(Sequence):
             self.data = data
             self.last_file_read = file
 
+        indices = self._batch_indices_pr_file[idx]
+        data = data[indices]
+
         X = data[:, :-1]
 
-        # transform to 3-dimensional input (for convolution)
+        # transform to 3-dimensional input (for convolution) with time as the third dimension
+        # dimensions: number of samples = batch size, sequence length = 6 (time), features = 12
         if self.transform:
-            X = X
+            XX = np.zeros((X.shape[0], 12))
+            XX[:,:2] = X[:,:2]
+            XX[:,4:] = X[:,14:]
+            X_stack = np.repeat(XX[:,None],6,axis=1)
+            X_stack[:,:,2] = X[:,2:8]
+            X_stack[:,:,3] = X[:,8:14]
+            X = X_stack
 
         if self.to_fit:
             y = data[:, -1]
@@ -135,7 +145,6 @@ if __name__ == "__main__":
     model = build_model(model_type=model_type)
     build_model().summary()
 
-    # checkpoints
     output_path = 'output_' + model_type + '/'
     Path(output_path).mkdir(parents=True, exist_ok=True)
     callbacks = [ModelCheckpoint(filepath=output_path + 'model.keras', save_best_only=True),
