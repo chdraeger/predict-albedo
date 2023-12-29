@@ -7,19 +7,23 @@ import glob
 import pandas as pd
 import numpy as np
 from pathlib import Path
+import CONSTANTS
 
 class dataloader(Sequence):
-    """
-    Generate data for each batch
-
-    Attributes:
-        path: Name of the directory containing the data files
-        batch_size: Size of the batch
-    """
-    def __init__(self, path, batch_size, shuffle=False, to_fit=True, standardize=False, standardize_file=None, transform=False):
+    def __init__(self, path, batch_size, shuffle=False, to_fit=True,
+                 standardize=False, standardize_file=None, transform=False):
         """
         Initialize
+
+        :param path:
+        :param batch_size:
+        :param shuffle:
+        :param to_fit:
+        :param standardize:
+        :param standardize_file:
+        :param transform:
         """
+
         self.path = path
         self.batch_size = batch_size
         self.shuffle = shuffle
@@ -48,11 +52,13 @@ class dataloader(Sequence):
             self._batch_file += [file] * int(np.ceil(size/batch_size))
             self._batch_indices_pr_file += indices_chunk
             count += size
-        self.no_samples = count
+        self.no_samples = count # total number of samples
 
     def __len__(self):
         """
         Denote the number of batches per epoch
+
+        :return:
         """
         return len(self._batch_indices_pr_file)
 
@@ -72,6 +78,9 @@ class dataloader(Sequence):
     def __getitem__(self, idx):
         """
         Generate one batch of data
+
+        :param idx:
+        :return:
         """
 
         file = self._batch_file[idx]
@@ -88,62 +97,79 @@ class dataloader(Sequence):
         indices = self._batch_indices_pr_file[idx]
         data = data[indices]
 
-        X = data[:, :-1]
+        X = np.delete(data, CONSTANTS.OUTPUT, axis=1)
 
         # transform to 3-dimensional input (for convolution) with time as the third dimension
+        # read dimensions from meta file
         # dimensions: number of samples = batch size, sequence length = 6 (time), features = 12
         if self.transform:
-            XX = np.zeros((X.shape[0], 12))
-            XX[:,:2] = X[:,:2]
-            XX[:,4:] = X[:,14:]
-            X_stack = np.repeat(XX[:,None],6,axis=1)
-            X_stack[:,:,2] = X[:,2:8]
-            X_stack[:,:,3] = X[:,8:14]
+            nr_features = len(CONSTANTS.TIME_INVARIANT) + len(CONSTANTS.LAGS)
+            X_reshape = np.zeros((X.shape[0], nr_features))
+            X_reshape[:, np.arange(len(CONSTANTS.TIME_INVARIANT))] = X[:, CONSTANTS.TIME_INVARIANT]
+            X_stack = np.repeat(X_reshape[:, None], len(CONSTANTS.LAGS[0]), axis=1)
+            X_stack[:, :, np.arange(len(CONSTANTS.TIME_INVARIANT), nr_features)] = X[:, np.array(CONSTANTS.LAGS).T]
+
             X = X_stack
 
         if self.to_fit:
-            y = data[:, -1]
+            y = data[:, CONSTANTS.OUTPUT]
             return X, y
         else:
             return X
 
 
 # define and build a Sequential model
-def build_model(model_type = 'fnn'):
+def build_model(model_type='fnn'):
+    """
+
+
+    :param model_type:
+    :return:
+    """
+
+    model = Sequential()
 
     match model_type:
         case 'fnn':
-            model = Sequential()
-            model.add(layers.Dense(2 ** 8, input_shape=(22,), activation='relu'))
+            nr_features = len(CONSTANTS.TIME_INVARIANT) + sum(len(x) for x in CONSTANTS.LAGS)
+            model.add(layers.Dense(256, input_shape=(nr_features,), activation='relu'))
             model.add(layers.Dropout(0.2))
-            model.add(layers.Dense(2 ** 7, activation='relu'))
+            model.add(layers.Dense(128, activation='relu'))
             model.add(layers.Dropout(0.1))
-            model.add(layers.Dense(1, activation=None))
-            model.compile(loss='mse', optimizer='adam', metrics=['mae'])
         case 'lstm':
-            model = Sequential()
+            nr_features = len(CONSTANTS.TIME_INVARIANT) + len(CONSTANTS.LAGS)
+            nr_timesteps = len(CONSTANTS.LAGS[0])
+            model.add(layers.LSTM(4, return_sequences=False, input_shape=(nr_timesteps, nr_features)))
+            # model.add(layers.Dropout(0.2))
+            # model.add(layers.LSTM(2, return_sequences=True))
+            # model.add(layers.Dropout(0.1))
         case 'resnet':
             model = Sequential()
+
+    model.add(layers.Dense(1, activation=None))
+    model.compile(loss='mse', optimizer='adam', metrics=['mae'])
 
     return model
 
 
 if __name__ == "__main__":
-    # specifications
-    epochs = 2 # 30
-    batch_size = 40000 # 2**7
+    epochs = 2  # 30
+    batch_size = 40000  # 2**7
     standardize_file = 'data/meta/std.csv'
-    transform = False
-    model_type = 'fnn'
+    transform = True
+    model_type = 'lstm'   # 'fnn'
 
     print('Initiate data generators \n')
-    train_gen = dataloader('data/train1/', batch_size, standardize=True, standardize_file=standardize_file, transform=transform, shuffle=True)
-    validate_gen = dataloader('data/validate1/', batch_size, standardize=True, standardize_file=standardize_file, transform=transform)
-    test_gen = dataloader('data/test1/', batch_size, standardize=True, standardize_file=standardize_file, transform=transform)
+    train_gen = dataloader('data/train1/', batch_size,
+                           standardize=True, standardize_file=standardize_file, transform=transform, shuffle=True)
+    validate_gen = dataloader('data/validate1/', batch_size,
+                              standardize=True, standardize_file=standardize_file, transform=transform)
+    test_gen = dataloader('data/test1/', batch_size,
+                          standardize=True, standardize_file=standardize_file, transform=transform)
 
     print('Fit model \n')
     model = build_model(model_type=model_type)
-    build_model().summary()
+    model.summary()
 
     output_path = 'output_' + model_type + '/'
     Path(output_path).mkdir(parents=True, exist_ok=True)
@@ -164,4 +190,4 @@ if __name__ == "__main__":
 
     print('Predict on test set \n')
     prediction = model.evaluate(test_gen)
-    np.savetxt(output_path + 'loss_test.txt', prediction, header="test_loss,test_mae")
+    np.savetxt(output_path + 'loss_test.txt', prediction, header="test_loss,test_mae", fmt='%1.4f')

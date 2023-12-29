@@ -1,7 +1,8 @@
 # predict-albedo
 Predict MODIS albedo
 
-Input file columns:
+shape constants are defined in the CONSTANTS.py file
+
 z: elevation
 rel_z
 T0
