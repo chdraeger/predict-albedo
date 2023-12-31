@@ -122,7 +122,6 @@ class dataloader(Sequence):
 def build_model(model_type='fnn'):
     """
 
-
     :param model_type:
     :return:
     """
@@ -139,32 +138,39 @@ def build_model(model_type='fnn'):
         case 'lstm':
             nr_features = len(CONSTANTS.TIME_INVARIANT) + len(CONSTANTS.LAGS)
             nr_timesteps = len(CONSTANTS.LAGS[0])
-            model.add(layers.LSTM(4, return_sequences=False, input_shape=(nr_timesteps, nr_features)))
-            # model.add(layers.Dropout(0.2))
-            # model.add(layers.LSTM(2, return_sequences=True))
-            # model.add(layers.Dropout(0.1))
-        case 'resnet':
-            model = Sequential()
+            model.add(layers.LSTM(32, return_sequences=True, input_shape=(nr_timesteps, nr_features), dropout=0.2))
+            model.add(layers.LSTM(8, return_sequences=False, dropout=0.1))
 
     model.add(layers.Dense(1, activation=None))
     model.compile(loss='mse', optimizer='adam', metrics=['mae'])
 
     return model
 
+def get_callbacks(output_path):
+    """
+
+    :param model_type:
+    :return:
+    """
+    Path(output_path).mkdir(parents=True, exist_ok=True)
+    callbacks = [ModelCheckpoint(filepath=output_path + 'model.keras', save_best_only=True),
+                 CSVLogger(output_path + 'history.csv')]
+
+    return callbacks
 
 if __name__ == "__main__":
-    epochs = 2  # 30
-    batch_size = 40000  # 2**7
+    epochs = 50  # 30
+    batch_size = 128
     standardize_file = 'data/meta/std.csv'
-    transform = True
-    model_type = 'lstm'   # 'fnn'
+    transform = False
+    model_type = 'fnn'   # 'fnn'
 
     print('Initiate data generators \n')
-    train_gen = dataloader('data/train1/', batch_size,
+    train_gen = dataloader('data/train/', batch_size,
                            standardize=True, standardize_file=standardize_file, transform=transform, shuffle=True)
-    validate_gen = dataloader('data/validate1/', batch_size,
+    validate_gen = dataloader('data/validate/', batch_size,
                               standardize=True, standardize_file=standardize_file, transform=transform)
-    test_gen = dataloader('data/test1/', batch_size,
+    test_gen = dataloader('data/test/', batch_size,
                           standardize=True, standardize_file=standardize_file, transform=transform)
 
     print('Fit model \n')
@@ -172,15 +178,11 @@ if __name__ == "__main__":
     model.summary()
 
     output_path = 'output_' + model_type + '/'
-    Path(output_path).mkdir(parents=True, exist_ok=True)
-    callbacks = [ModelCheckpoint(filepath=output_path + 'model.keras', save_best_only=True),
-                 CSVLogger(output_path + 'history.csv')]
-
     fitted_model = model.fit(
         train_gen,
         validation_data=validate_gen,
         epochs=epochs,
-        callbacks=callbacks
+        callbacks=get_callbacks(output_path)
     )
 
     print('Plot training and validation \n')
