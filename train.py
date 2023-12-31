@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from tensorflow.keras.utils import Sequence
 from tensorflow.keras.models import Sequential
 from tensorflow.keras import layers
@@ -8,6 +10,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import CONSTANTS
+from tensorflow import keras
 
 class dataloader(Sequence):
     def __init__(self, path, batch_size, shuffle=False, to_fit=True,
@@ -152,25 +155,27 @@ def get_callbacks(output_path):
     :param model_type:
     :return:
     """
+    logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+    tensorboard_callback = keras.callbacks.TensorBoard(log_dir=logdir)
     Path(output_path).mkdir(parents=True, exist_ok=True)
-    callbacks = [ModelCheckpoint(filepath=output_path + 'model.keras', save_best_only=True),
+    callbacks = [tensorboard_callback, ModelCheckpoint(filepath=output_path + 'model.keras', save_best_only=True),
                  CSVLogger(output_path + 'history.csv')]
 
     return callbacks
 
 if __name__ == "__main__":
-    epochs = 50  # 30
+    epochs = 20  # 30
     batch_size = 128
     standardize_file = 'data/meta/std.csv'
     transform = False
     model_type = 'fnn'   # 'fnn'
 
     print('Initiate data generators \n')
-    train_gen = dataloader('data/train/', batch_size,
+    train_gen = dataloader('data/train1/', batch_size,
                            standardize=True, standardize_file=standardize_file, transform=transform, shuffle=True)
-    validate_gen = dataloader('data/validate/', batch_size,
+    validate_gen = dataloader('data/validate1/', batch_size,
                               standardize=True, standardize_file=standardize_file, transform=transform)
-    test_gen = dataloader('data/test/', batch_size,
+    test_gen = dataloader('data/test1/', batch_size,
                           standardize=True, standardize_file=standardize_file, transform=transform)
 
     print('Fit model \n')
@@ -182,7 +187,9 @@ if __name__ == "__main__":
         train_gen,
         validation_data=validate_gen,
         epochs=epochs,
-        callbacks=get_callbacks(output_path)
+        callbacks=get_callbacks(output_path),
+        use_multiprocessing=True,
+        workers=8
     )
 
     print('Plot training and validation \n')
