@@ -160,7 +160,7 @@ def get_callbacks(result_dir):
 if __name__ == "__main__":
 
     is_gpu = True    # Detect cpu or gpu
-    epochs = 5
+    epochs = 1
     batch_size = 1024
     standardize_file = 'data/meta/std.csv'
     transform = False
@@ -201,5 +201,7 @@ if __name__ == "__main__":
     fig.savefig(result_dir + "/loss_train_val.png")
 
     print('Predict on test set \n')
-    prediction = model.evaluate(test_gen)
-    np.savetxt(result_dir + '/loss_test.txt', prediction, header="test_loss,test_mae", fmt='%1.4f')
+    prediction = model.predict(test_gen)
+    np.savetxt(result_dir + '/pred_test.txt', prediction, fmt='%1.5f')
+    # prediction = model.evaluate(test_gen)
+    # np.savetxt(result_dir + '/loss_test.txt', prediction, header="test_loss,test_mae", fmt='%1.4f')
