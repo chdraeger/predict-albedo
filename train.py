@@ -184,7 +184,7 @@ if __name__ == "__main__":
 
     print('Fit model \n')
     model = build_model(model_type=model_type)
-    model.summary()
+    model.summary() #
 
     fitted_model = model.fit(
         train_gen,
