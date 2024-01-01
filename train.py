@@ -1,18 +1,13 @@
-from datetime import datetime
-
-from tensorflow.keras.utils import Sequence
-from tensorflow.keras.models import Sequential
-from tensorflow.keras import layers
-from tensorflow.keras.callbacks import ModelCheckpoint
-from tensorflow.keras.callbacks import CSVLogger
 import glob
+import os
 import pandas as pd
 import numpy as np
+from datetime import datetime
 from pathlib import Path
-import CONSTANTS
 from tensorflow import keras
+import CONSTANTS
 
-class dataloader(Sequence):
+class dataloader(keras.utils.Sequence):
     def __init__(self, path, batch_size, shuffle=False, to_fit=True,
                  standardize=False, standardize_file=None, transform=False):
         """
@@ -59,7 +54,7 @@ class dataloader(Sequence):
 
     def __len__(self):
         """
-        Denote the number of batches per epoch
+        Denote the number of batches per epoch.
 
         :return:
         """
@@ -91,9 +86,6 @@ class dataloader(Sequence):
             data = self.data
         else:
             data = np.load(file)['data']
-            if self.standardize:
-                std = np.genfromtxt(self.standardize_file, dtype=float, delimiter=',', names=True)
-                data = (data - std['mean']) / std['sd']
             self.data = data
             self.last_file_read = file
 
@@ -101,6 +93,9 @@ class dataloader(Sequence):
         data = data[indices]
 
         X = np.delete(data, CONSTANTS.OUTPUT, axis=1)
+        if self.standardize:
+            std = np.genfromtxt(self.standardize_file, dtype=float, delimiter=',', names=True)
+            X = (X - std['mean']) / std['sd']
 
         # transform to 3-dimensional input (for convolution) with time as the third dimension
         # read dimensions from meta file
@@ -129,55 +124,55 @@ def build_model(model_type='fnn'):
     :return:
     """
 
-    model = Sequential()
+    model = keras.models.Sequential()
 
     match model_type:
         case 'fnn':
             nr_features = len(CONSTANTS.TIME_INVARIANT) + sum(len(x) for x in CONSTANTS.LAGS)
-            model.add(layers.Dense(256, input_shape=(nr_features,), activation='relu'))
-            model.add(layers.Dropout(0.2))
-            model.add(layers.Dense(128, activation='relu'))
-            model.add(layers.Dropout(0.1))
+            model.add(keras.layers.Dense(512, input_shape=(nr_features,), activation='relu'))
+            model.add(keras.layers.Dropout(0.2))
+            model.add(keras.layers.Dense(256, activation='relu'))
+            model.add(keras.layers.Dropout(0.1))
+            model.add(keras.layers.Dense(128, activation='relu'))
+            model.add(keras.layers.Dropout(0.05))
         case 'lstm':
             nr_features = len(CONSTANTS.TIME_INVARIANT) + len(CONSTANTS.LAGS)
             nr_timesteps = len(CONSTANTS.LAGS[0])
-            model.add(layers.LSTM(32, return_sequences=True, input_shape=(nr_timesteps, nr_features), dropout=0.2))
-            model.add(layers.LSTM(8, return_sequences=False, dropout=0.1))
+            model.add(keras.layers.LSTM(32, return_sequences=True, input_shape=(nr_timesteps, nr_features), dropout=0.2))
+            model.add(keras.layers.LSTM(8, return_sequences=False, dropout=0.1))
 
-    model.add(layers.Dense(1, activation='sigmoid'))
+    model.add(keras.layers.Dense(1, activation='sigmoid'))
     model.compile(loss='mse', optimizer='adam', metrics=['mae'])
 
     return model
 
-def get_callbacks(output_path):
-    """
+def get_callbacks(result_dir):
 
-    :param model_type:
-    :return:
-    """
-    logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+    logdir = "logs/fit/" + datetime.now().strftime("%Y%m%d-%H%M%S")
     tensorboard_callback = keras.callbacks.TensorBoard(log_dir=logdir)
-    Path(output_path).mkdir(parents=True, exist_ok=True)
-    callbacks = [tensorboard_callback, ModelCheckpoint(filepath=output_path + 'model.keras', save_best_only=True),
-                 CSVLogger(output_path + 'history.csv')]
+    Path(result_dir).mkdir(parents=True, exist_ok=True)
+    callbacks = [tensorboard_callback,
+                 keras.callbacks.ModelCheckpoint(filepath=result_dir + '/model.keras', save_best_only=True),
+                 keras.callbacks.CSVLogger(result_dir + '/history.csv')]
 
     return callbacks
 
 if __name__ == "__main__":
-    import os
-    # basefolder = os.path.basename(__file__).split(".")[0]
-    # result_dir = f"results/{basefolder}/{datetime.now():%Y-%m-%d_%H_%M_%S}"
-    # os.makedirs(result_dir)
-    mse = keras.losses.MeanSquaredError()
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = ''
-    # Detect cpu or gpu
-    # is_gpu = True
-    epochs = 30  # 30
+    is_gpu = True    # Detect cpu or gpu
+    epochs = 5
     batch_size = 1024
     standardize_file = 'data/meta/std.csv'
     transform = False
-    model_type = 'fnn'   # 'fnn'
+    model_type = 'fnn'   # 'fnn', 'lstm'
+
+    # set-up
+    if not is_gpu:
+        os.environ['CUDA_VISIBLE_DEVICES'] = ''
+
+    basefolder = os.path.basename(__file__).split(".")[0]
+    result_dir = f"results/{basefolder}/{datetime.now():%Y-%m-%d_%H_%M_%S}"
+    os.makedirs(result_dir)
 
     print('Initiate data generators \n')
     train_gen = dataloader('data/train1/', batch_size,
@@ -191,12 +186,11 @@ if __name__ == "__main__":
     model = build_model(model_type=model_type)
     model.summary()
 
-    output_path = 'output_' + model_type + '/'
     fitted_model = model.fit(
         train_gen,
-        # validation_data=validate_gen,
+        validation_data=validate_gen,
         epochs=epochs,
-        callbacks=get_callbacks(output_path),
+        callbacks=get_callbacks(result_dir),
         use_multiprocessing=True,
         workers=4
     )
@@ -204,8 +198,8 @@ if __name__ == "__main__":
     print('Plot training and validation \n')
     plt = pd.DataFrame(fitted_model.history).plot(figsize=(8, 5))
     fig = plt.get_figure()
-    fig.savefig(output_path + "loss_train_val.png")
+    fig.savefig(result_dir + "/loss_train_val.png")
 
     print('Predict on test set \n')
     prediction = model.evaluate(test_gen)
-    np.savetxt(output_path + 'loss_test.txt', prediction, header="test_loss,test_mae", fmt='%1.4f')
+    np.savetxt(result_dir + '/loss_test.txt', prediction, header="test_loss,test_mae", fmt='%1.4f')
