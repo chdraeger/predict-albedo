@@ -144,7 +144,7 @@ def build_model(model_type='fnn'):
             model.add(layers.LSTM(32, return_sequences=True, input_shape=(nr_timesteps, nr_features), dropout=0.2))
             model.add(layers.LSTM(8, return_sequences=False, dropout=0.1))
 
-    model.add(layers.Dense(1, activation=None))
+    model.add(layers.Dense(1, activation='sigmoid'))
     model.compile(loss='mse', optimizer='adam', metrics=['mae'])
 
     return model
@@ -164,8 +164,17 @@ def get_callbacks(output_path):
     return callbacks
 
 if __name__ == "__main__":
-    epochs = 20  # 30
-    batch_size = 128
+    import os
+    # basefolder = os.path.basename(__file__).split(".")[0]
+    # result_dir = f"results/{basefolder}/{datetime.now():%Y-%m-%d_%H_%M_%S}"
+    # os.makedirs(result_dir)
+    mse = keras.losses.MeanSquaredError()
+
+    os.environ['CUDA_VISIBLE_DEVICES'] = ''
+    # Detect cpu or gpu
+    # is_gpu = True
+    epochs = 30  # 30
+    batch_size = 1024
     standardize_file = 'data/meta/std.csv'
     transform = False
     model_type = 'fnn'   # 'fnn'
@@ -185,11 +194,11 @@ if __name__ == "__main__":
     output_path = 'output_' + model_type + '/'
     fitted_model = model.fit(
         train_gen,
-        validation_data=validate_gen,
+        # validation_data=validate_gen,
         epochs=epochs,
         callbacks=get_callbacks(output_path),
         use_multiprocessing=True,
-        workers=8
+        workers=4
     )
 
     print('Plot training and validation \n')
