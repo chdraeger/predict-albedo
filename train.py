@@ -131,15 +131,16 @@ def build_model(model_type='fnn'):
             nr_features = len(CONSTANTS.TIME_INVARIANT) + sum(len(x) for x in CONSTANTS.LAGS)
             model.add(keras.layers.Dense(512, input_shape=(nr_features,), activation='relu'))
             model.add(keras.layers.Dropout(0.2))
-            model.add(keras.layers.Dense(256, activation='relu'))
+            model.add(keras.layers.Dense(256, activation='relu'))`
             model.add(keras.layers.Dropout(0.1))
             model.add(keras.layers.Dense(128, activation='relu'))
             model.add(keras.layers.Dropout(0.05))
         case 'lstm':
             nr_features = len(CONSTANTS.TIME_INVARIANT) + len(CONSTANTS.LAGS)
             nr_timesteps = len(CONSTANTS.LAGS[0])
-            model.add(keras.layers.LSTM(32, return_sequences=True, input_shape=(nr_timesteps, nr_features), dropout=0.2))
-            model.add(keras.layers.LSTM(8, return_sequences=False, dropout=0.1))
+            model.add(keras.layers.LSTM(64, return_sequences=True, input_shape=(nr_timesteps, nr_features), dropout=0.15))
+            model.add(keras.layers.LSTM(32, return_sequences=True, input_shape=(nr_timesteps, nr_features), dropout=0.1))
+            model.add(keras.layers.LSTM(16, return_sequences=False, dropout=0.05))
 
     model.add(keras.layers.Dense(1, activation='sigmoid'))
     model.compile(loss='mse', optimizer='adam', metrics=['mae'])
@@ -163,8 +164,8 @@ if __name__ == "__main__":
     epochs = 30
     batch_size = 1024
     standardize_file = 'data/meta/std.csv'
-    transform = False
-    model_type = 'fnn'   # 'fnn', 'lstm'
+    transform = True
+    model_type = 'lstm'   # 'fnn', 'lstm'
 
     # set-up
     if not is_gpu:
@@ -175,11 +176,11 @@ if __name__ == "__main__":
     os.makedirs(result_dir)
 
     print('Initiate data generators \n')
-    train_gen = dataloader('data/train/', batch_size,
+    train_gen = dataloader('data/train1/', batch_size,
                            standardize=True, standardize_file=standardize_file, transform=transform, shuffle=True)
-    validate_gen = dataloader('data/validate/', batch_size,
+    validate_gen = dataloader('data/validate1/', batch_size,
                               standardize=True, standardize_file=standardize_file, transform=transform)
-    test_gen = dataloader('data/test/', batch_size,
+    test_gen = dataloader('data/test1/', batch_size,
                           standardize=True, standardize_file=standardize_file, transform=transform)
 
     print('Fit model \n')
