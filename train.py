@@ -131,7 +131,7 @@ def build_model(model_type='fnn'):
             nr_features = len(CONSTANTS.TIME_INVARIANT) + sum(len(x) for x in CONSTANTS.LAGS)
             model.add(keras.layers.Dense(512, input_shape=(nr_features,), activation='relu'))
             model.add(keras.layers.Dropout(0.2))
-            model.add(keras.layers.Dense(256, activation='relu'))`
+            model.add(keras.layers.Dense(256, activation='relu'))
             model.add(keras.layers.Dropout(0.1))
             model.add(keras.layers.Dense(128, activation='relu'))
             model.add(keras.layers.Dropout(0.05))
@@ -164,8 +164,8 @@ if __name__ == "__main__":
     epochs = 30
     batch_size = 1024
     standardize_file = 'data/meta/std.csv'
-    transform = True
-    model_type = 'lstm'   # 'fnn', 'lstm'
+    transform = False   # True for 'lstm'
+    model_type = 'fnn'   # 'fnn', 'lstm'
 
     # set-up
     if not is_gpu:
@@ -176,11 +176,11 @@ if __name__ == "__main__":
     os.makedirs(result_dir)
 
     print('Initiate data generators \n')
-    train_gen = dataloader('data/train1/', batch_size,
+    train_gen = dataloader('data/train/', batch_size,
                            standardize=True, standardize_file=standardize_file, transform=transform, shuffle=True)
-    validate_gen = dataloader('data/validate1/', batch_size,
+    validate_gen = dataloader('data/validate/', batch_size,
                               standardize=True, standardize_file=standardize_file, transform=transform)
-    test_gen = dataloader('data/test1/', batch_size,
+    test_gen = dataloader('data/test/', batch_size,
                           standardize=True, standardize_file=standardize_file, transform=transform)
 
     print('Fit model \n')
@@ -204,5 +204,5 @@ if __name__ == "__main__":
     print('Predict on test set \n')
     prediction = model.predict(test_gen)
     np.savetxt(result_dir + '/pred_test.txt', prediction, fmt='%1.4f')
-    # prediction = model.evaluate(test_gen)
-    # np.savetxt(result_dir + '/loss_test.txt', prediction, header="test_loss,test_mae", fmt='%1.4f')
+    prediction = model.evaluate(test_gen)
+    np.savetxt(result_dir + '/loss_test.txt', prediction, header="test_loss,test_mae", fmt='%1.4f')
