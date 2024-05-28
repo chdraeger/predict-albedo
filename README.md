@@ -1,6 +1,9 @@
-# predict-albedo
-Predict MODIS albedo
+# Train neural network to predict mountain glacier albedo, trained on MODIS albedo data
 
-To do: project summary
+Code for the albedo prediction in the study of Draeger et al. (2024), *Assessing the impact of calibration and albedo models on regional glacier modeling with surface energy balance in southwestern Canada*
 
-shape constants are defined in the CONSTANTS.py file
+Below is a short guide to the data used, and for reproducing the training and testing.
+
+## Data
+
+Shape constants for the input data are defined in `CONSTANTS.py`.
