@@ -9,7 +9,7 @@ import CONSTANTS
 
 class dataloader(keras.utils.Sequence):
     def __init__(self, path, batch_size, shuffle=False, to_fit=True,
-                 standardize=False, standardize_file=None, transform=False):
+                 standardize=False, file_standardize=None, transform=False):
         """
         Initialize
 
@@ -18,7 +18,7 @@ class dataloader(keras.utils.Sequence):
         :param shuffle:
         :param to_fit:
         :param standardize:
-        :param standardize_file:
+        :param file_standardize:
         :param transform:
         """
 
@@ -27,7 +27,7 @@ class dataloader(keras.utils.Sequence):
         self.shuffle = shuffle
         self.to_fit = to_fit
         self.standardize = standardize
-        self.standardize_file = standardize_file
+        self.file_standardize = file_standardize
         self.transform = transform
         self.data = None
         self.last_file_read = None
@@ -51,6 +51,7 @@ class dataloader(keras.utils.Sequence):
             self._batch_indices_pr_file += indices_chunk
             count += size
         self.no_samples = count # total number of samples
+        self.std = np.genfromtxt(self.file_standardize, dtype=float, delimiter=',', names=True)
 
     def __len__(self):
         """
@@ -68,7 +69,7 @@ class dataloader(keras.utils.Sequence):
         :param shuffle:
         :return:
         """
-        filenames = glob.glob(path + '*' + '.npz')
+        filenames = glob.glob(os.path.join(path, '*.npz'))
         if shuffle:
             np.random.shuffle(filenames)
         return filenames
@@ -94,7 +95,7 @@ class dataloader(keras.utils.Sequence):
 
         X = np.delete(data, CONSTANTS.OUTPUT, axis=1)
         if self.standardize:
-            std = np.genfromtxt(self.standardize_file, dtype=float, delimiter=',', names=True)
+            std = self.std
             X = (X - std['mean']) / std['sd']
 
         # transform to 3-dimensional input (for convolution) with time as the third dimension
@@ -147,23 +148,26 @@ def build_model(model_type='fnn'):
 
     return model
 
-def get_callbacks(result_dir):
-
-    logdir = "logs/fit/" + datetime.now().strftime("%Y%m%d-%H%M%S")
-    tensorboard_callback = keras.callbacks.TensorBoard(log_dir=logdir)
-    Path(result_dir).mkdir(parents=True, exist_ok=True)
+def get_callbacks(path_results):
+    path_logs = os.path.join(path_results,"logs")
+    tensorboard_callback = keras.callbacks.TensorBoard(log_dir=path_logs)
+    Path(path_results).mkdir(parents=True, exist_ok=True)
     callbacks = [tensorboard_callback,
-                 keras.callbacks.ModelCheckpoint(filepath=result_dir + '/model.keras', save_best_only=True),
-                 keras.callbacks.CSVLogger(result_dir + '/history.csv')]
+                 keras.callbacks.ModelCheckpoint(filepath=path_results + '/model.keras', save_best_only=True),
+                 keras.callbacks.CSVLogger(path_results + '/history.csv')]
 
     return callbacks
 
 if __name__ == "__main__":
 
-    is_gpu = True    # Detect cpu or gpu
+    is_gpu = False    # Detect cpu or gpu
     epochs = 30
     batch_size = 1024
-    standardize_file = 'data/meta/std.csv'
+    path_train_data = '/home/christina/Data/predict-albedo/input/train'
+    path_val_data = '/home/christina/Data/predict-albedo/input/validate'
+    path_test_data = '/home/christina/Data/predict-albedo/input/test'
+    path_results_base = '/home/christina/Data/predict-albedo/results'
+    file_standardize = '/home/christina/Data/predict-albedo/input/meta/std.csv'
     transform = False   # True for 'lstm'
     model_type = 'fnn'   # 'fnn', 'lstm'
 
@@ -172,16 +176,16 @@ if __name__ == "__main__":
         os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
     basefolder = os.path.basename(__file__).split(".")[0]
-    result_dir = f"results/{basefolder}/{datetime.now():%Y-%m-%d_%H_%M_%S}"
-    os.makedirs(result_dir)
+    path_results = f"{path_results_base}/{basefolder}/{datetime.now():%Y-%m-%d_%H_%M_%S}"
+    os.makedirs(path_results)
 
     print('Initiate data generators \n')
-    train_gen = dataloader('data/train/', batch_size,
-                           standardize=True, standardize_file=standardize_file, transform=transform, shuffle=True)
-    validate_gen = dataloader('data/validate/', batch_size,
-                              standardize=True, standardize_file=standardize_file, transform=transform)
-    test_gen = dataloader('data/test/', batch_size,
-                          standardize=True, standardize_file=standardize_file, transform=transform)
+    train_gen = dataloader(path_train_data, batch_size,
+                           standardize=True, file_standardize=file_standardize, transform=transform, shuffle=True)
+    validate_gen = dataloader(path_val_data, batch_size,
+                              standardize=True, file_standardize=file_standardize, transform=transform)
+    test_gen = dataloader(path_test_data, batch_size,
+                          standardize=True, file_standardize=file_standardize, transform=transform)
 
     print('Fit model \n')
     model = build_model(model_type=model_type)
@@ -191,18 +195,21 @@ if __name__ == "__main__":
         train_gen,
         validation_data=validate_gen,
         epochs=epochs,
-        callbacks=get_callbacks(result_dir),
-        use_multiprocessing=True,
-        workers=4
+        callbacks=get_callbacks(path_results),
+        # use_multiprocessing=True,
+        # workers=4
     )
 
     print('Plot training and validation \n')
     plt = pd.DataFrame(fitted_model.history).plot(figsize=(8, 5))
     fig = plt.get_figure()
-    fig.savefig(result_dir + "/loss_train_val.png")
+    file_loss_train_val = os.path.join(path_results,"loss_train_val.png")
+    fig.savefig(file_loss_train_val)
 
     print('Predict on test set \n')
     prediction = model.predict(test_gen)
-    np.savetxt(result_dir + '/pred_test.txt', prediction, fmt='%1.4f')
+    file_loss_test = os.path.join(path_results,"loss_test.txt")
+    file_pred_test = os.path.join(path_results,"pred_test.txt")
+    np.savetxt(file_pred_test, prediction, fmt='%1.4f')
     prediction = model.evaluate(test_gen)
-    np.savetxt(result_dir + '/loss_test.txt', prediction, header="test_loss,test_mae", fmt='%1.4f')
+    np.savetxt(file_loss_test, prediction, header="test_loss,test_mae", fmt='%1.4f')

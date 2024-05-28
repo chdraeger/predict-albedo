@@ -1,11 +1,14 @@
 [tool.poetry]
 name = "predict_albedo"
 version = "0.1.0"
-description = "Predict albedo"
-authors = ["Christina Draeger"]
+description = "Predict mountain glacier albedo"
+authors = ["Christina Draeger <cdraeger@eoas.ubc.ca>"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
+pandas = "^2.2.2"
+tensorflow = "^2.16.1"
+matplotlib = "^3.9.0"
 
 [tool.poetry.dev-dependencies]
 
