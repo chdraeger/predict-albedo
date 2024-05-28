@@ -1,7 +1,7 @@
 # Predict mountain glacier albedo values
-## Train, validate and test neural networks for albedo prediction
+### Train, validate and test neural network models for albedo prediction
 
-Code for the albedo prediction in the study of Draeger et al. (2024), *Assessing the impact of calibration and albedo models on regional glacier modeling with surface energy balance in southwestern Canada*
+Code for the albedo prediction in the study of Draeger et al. (2024), *Assessing the impact of calibration and albedo models on regional glacier modeling with surface energy balance in southwestern Canada* **(under review)**
 
 Below is a short guide to the data used, and for reproducing the training and testing.
 
@@ -16,7 +16,7 @@ Shape constants for the input data are defined in `CONSTANTS.py`.
 ### Data used in this study
 **Input:** Daily climatic values, as well as overall climatic and topographic characteristics for each MODIS grid cell, including:
 - Day of year
-- $T_{t_{0}}$, $T_{t_{-1}}$, $T_{t_{-2}}$, $T_{t_{-3}}$, $T_{t_{-4}}$ and $T_{t_{-5}}$: \qty{2}{\metre} temperature, including lags of up to 5 days
+- $T_{t_{0}}$, $T_{t_{-1}}$, $T_{t_{-2}}$, $T_{t_{-3}}$, $T_{t_{-4}}$ and $T_{t_{-5}}$: 2m-temperature, including lags of up to 5 days
 - $P_{t_{0}}$, $P_{t_{-1}}$, $P_{t_{-2}}$, $P_{t_{-3}}$, $P_{t_{-4}}$ and $P_{t_{-5}}$: Total precipitation, including lags of up to 5 days
 - MODIS grid cell elevation
 - Normalized elevation (relative to the glacier's minimum and maximum elevation)
