@@ -5,5 +5,5 @@ Code for the albedo prediction in the study of Draeger et al. (2024), *Assessing
 Below is a short guide to the data used, and for reproducing the training and testing.
 
 ## Data
-
+MODIS albedo and meteorological and topographic data.
 Shape constants for the input data are defined in `CONSTANTS.py`.
