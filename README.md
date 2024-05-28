@@ -1,5 +1,5 @@
 # Predict mountain glacier albedo values
-### Train, validate and test neural network models for albedo prediction
+### Train, validate and test neural network models for albedo prediction with MODIS data
 
 Code for the albedo prediction in the study of Draeger et al. (2024), *Assessing the impact of calibration and albedo models on regional glacier modeling with surface energy balance in southwestern Canada* **(under review)**
 
