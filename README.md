@@ -22,7 +22,8 @@ Shape constants for the input data are defined in `CONSTANTS.py`.
 - Normalized elevation (relative to the glacier's minimum and maximum elevation)
 - Slope
 - Aspect
-- Multi-year average temperature range, including anomaly (anomalies indicate the discrepancy of the current mass balance year to the multi-year averages)
+- Multi-year average temperature range, including anomaly (anomalies indicate the discrepancy of the current mass
+balance year to the multi-year averages)
 - Multi-year average summer temperature, including anomaly
 - Multi-year average total winter precipitation, including anomaly
 
@@ -34,4 +35,11 @@ Code for training, validating and testing two different machine learning albedo 
 - Feed-forward Neural Network (FNN) 
 - Long-short term memory (LSTM)
 
-The neural network albedo models employed standard architectures with dropout layers of up to 0.2. The FNN albedo model has approximately 180k parameters across four layers, while the LSTM model contains around 35k parameters. We used 30 epochs, a batch size of 1024, Adam optimizer with a learning rate 0.01, and the Mean Squared Error (MSE) as the loss function.
+The neural network albedo models employed standard architectures with dropout layers of up to 0.2.
+The FNN albedo model has approximately 180k parameters across four layers, while the LSTM model contains around 35k parameters. 
+We use the Adam optimizer with a learning rate 0.01, and the Mean Squared Error (MSE) as the loss function.
+
+
+## Run the code
+
+Change the paths and the run settings (epoch, batch size, model type, etc.) in `train.py` and run the file.
