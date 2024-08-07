@@ -3,7 +3,7 @@
 
 Code for the albedo prediction in the study of Draeger et al. (2024), *Reconstruction and attribution of glacier mass changes across Western Canada from physics-based and neural network models* **(under review)**
 
-**Please cite this paper when using the code.**
+*Please cite this paper when using this code.*
 
 Below is a short guide to the data used, and for reproducing the training and testing.
 
