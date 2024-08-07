@@ -7,19 +7,19 @@ from pathlib import Path
 from tensorflow import keras
 import CONSTANTS
 
-class dataloader(keras.utils.Sequence):
+class Dataloader(keras.utils.Sequence):
     def __init__(self, path, batch_size, shuffle=False, to_fit=True,
                  standardize=False, file_standardize=None, transform=False):
         """
-        Initialize
+        Initialize class dataloader.
 
-        :param path:
-        :param batch_size:
-        :param shuffle:
-        :param to_fit:
-        :param standardize:
-        :param file_standardize:
-        :param transform:
+        :param path: Path to input data.
+        :param batch_size: Batch size.
+        :param shuffle: Boolean. If True, shuffle order of input files.
+        :param to_fit: Boolean. If True, return input (X) and output (y); for training, testing and validation. If False, return only input (X).
+        :param standardize: Boolean. If True, standardize the input data according to meta data from file_standardize.
+        :param file_standardize: File with meta information on mean and standard deviation of training data.
+        :param transform: Boolean. If true, transform to 3-dimensional input (for convolution) with time as the third dimension.
         """
 
         self.path = path
@@ -47,27 +47,27 @@ class dataloader(keras.utils.Sequence):
             if shuffle:
                 np.random.shuffle(indices)
             indices_chunk = [indices[x:x+self.batch_size] for x in range(0, len(indices), self.batch_size)]
-            self._batch_file += [file] * int(np.ceil(size/batch_size))
-            self._batch_indices_pr_file += indices_chunk
+            self._batch_file += [file] * int(np.ceil(size/batch_size))  # file name for input data per batch
+            self._batch_indices_pr_file += indices_chunk  # append current indices of the chunk of data
             count += size
-        self.no_samples = count # total number of samples
+        self.no_samples = count  # total number of samples
         self.std = np.genfromtxt(self.file_standardize, dtype=float, delimiter=',', names=True)
 
     def __len__(self):
         """
         Denote the number of batches per epoch.
 
-        :return:
+        :return: Number of batches per epoch.
         """
         return len(self._batch_indices_pr_file)
 
     def get_all_files(self, path, shuffle):
         """
-        Get all files in path
+        Get all files in path.
 
-        :param path:
-        :param shuffle:
-        :return:
+        :param path: Path to input .npz files.
+        :param shuffle: Boolean. If True, shuffle order of files.
+        :return: File names.
         """
         filenames = glob.glob(os.path.join(path, '*.npz'))
         if shuffle:
@@ -76,10 +76,11 @@ class dataloader(keras.utils.Sequence):
 
     def __getitem__(self, idx):
         """
-        Generate one batch of data
+        Generate one batch of data.
+        Get column id of time invariant variables, time-dependent variables and output from CONSTANTS.py file.
 
-        :param idx:
-        :return:
+        :param idx: Integer index [0,__len__-1].
+        :return: Batch of data.
         """
 
         file = self._batch_file[idx]
@@ -100,7 +101,7 @@ class dataloader(keras.utils.Sequence):
 
         # transform to 3-dimensional input (for convolution) with time as the third dimension
         # read dimensions from meta file
-        # dimensions: number of samples = batch size, sequence length = 6 (time), features = 12
+        # dimensions: number of samples = batch size, sequence length = time, features = number of variables
         if self.transform:
             nr_features = len(CONSTANTS.TIME_INVARIANT) + len(CONSTANTS.LAGS)
             X_reshape = np.zeros((X.shape[0], nr_features))
@@ -117,12 +118,13 @@ class dataloader(keras.utils.Sequence):
             return X
 
 
-# define and build a Sequential model
 def build_model(model_type='fnn'):
     """
+    Define and build the Keras neural network model.
+    Get number of time-invariant and time-dependent variables from CONSTANTS.py file.
 
-    :param model_type:
-    :return:
+    :param model_type: 'fnn' (feed-forward neural network) or 'lstm' (long short-term memory).
+    :return: Compiled keras model.
     """
 
     model = keras.models.Sequential()
@@ -149,6 +151,13 @@ def build_model(model_type='fnn'):
     return model
 
 def get_callbacks(path_results):
+    """
+    Define callbacks for the keras model.
+
+    :param path_results: Path for model results.
+    :return: Keras callbacks for model checkpoint and csv logging.
+    """
+
     path_logs = os.path.join(path_results,"logs")
     tensorboard_callback = keras.callbacks.TensorBoard(log_dir=path_logs)
     Path(path_results).mkdir(parents=True, exist_ok=True)
@@ -161,15 +170,15 @@ def get_callbacks(path_results):
 if __name__ == "__main__":
 
     is_gpu = False    # Detect cpu or gpu
-    epochs = 30
+    epochs = 1
     batch_size = 1024
-    path_train_data = '/home/christina/Data/predict-albedo/input/train'
-    path_val_data = '/home/christina/Data/predict-albedo/input/validate'
-    path_test_data = '/home/christina/Data/predict-albedo/input/test'
-    path_results_base = '/home/christina/Data/predict-albedo/results'
-    file_standardize = '/home/christina/Data/predict-albedo/input/meta/std.csv'
-    transform = False   # True for 'lstm'
-    model_type = 'fnn'   # 'fnn', 'lstm'
+    path_train_data = './data/input/train'  # '/home/christina/Data/predict_albedo/input/train'
+    path_val_data = './data/input/validate'  # '/home/christina/Data/predict_albedo/input/validate'
+    path_test_data = './data/input/test'  # '/home/christina/Data/predict_albedo/input/test'
+    path_results_base = './results'  # '/home/christina/Data/predict_albedo/results'
+    file_standardize = './data/input/meta/std.csv'  # '/home/christina/Data/predict_albedo/input/meta/std.csv'
+    transform = True   # Transform to 3d (time as 3rd dimension); True for 'lstm', False for 'fnn'
+    model_type = 'lstm'   # 'fnn', 'lstm'
 
     # set-up
     if not is_gpu:
@@ -177,19 +186,19 @@ if __name__ == "__main__":
 
     basefolder = os.path.basename(__file__).split(".")[0]
     path_results = f"{path_results_base}/{basefolder}/{datetime.now():%Y-%m-%d_%H_%M_%S}"
-    os.makedirs(path_results)
+    os.makedirs(path_results, exist_ok=True)
 
     print('Initiate data generators \n')
-    train_gen = dataloader(path_train_data, batch_size,
+    train_gen = Dataloader(path_train_data, batch_size,
                            standardize=True, file_standardize=file_standardize, transform=transform, shuffle=True)
-    validate_gen = dataloader(path_val_data, batch_size,
+    validate_gen = Dataloader(path_val_data, batch_size,
                               standardize=True, file_standardize=file_standardize, transform=transform)
-    test_gen = dataloader(path_test_data, batch_size,
+    test_gen = Dataloader(path_test_data, batch_size,
                           standardize=True, file_standardize=file_standardize, transform=transform)
 
     print('Fit model \n')
     model = build_model(model_type=model_type)
-    model.summary() #
+    model.summary()  # Print model summary
 
     fitted_model = model.fit(
         train_gen,
@@ -203,7 +212,7 @@ if __name__ == "__main__":
     print('Plot training and validation \n')
     plt = pd.DataFrame(fitted_model.history).plot(figsize=(8, 5))
     fig = plt.get_figure()
-    file_loss_train_val = os.path.join(path_results,"loss_train_val.png")
+    file_loss_train_val = os.path.join(path_results, "loss_train_val.png")
     fig.savefig(file_loss_train_val)
 
     print('Predict on test set \n')

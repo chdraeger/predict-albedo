@@ -1,7 +1,9 @@
 # Predict mountain glacier albedo values
 ### Train, validate and test neural network models for albedo prediction with MODIS data
 
-Code for the albedo prediction in the study of Draeger et al. (2024), *Assessing the impact of calibration and albedo models on regional glacier modeling with surface energy balance in southwestern Canada* **(under review)**
+Code for the albedo prediction in the study of Draeger et al. (2024), *Reconstruction and attribution of glacier mass changes across Western Canada from physics-based and neural network models* **(under review)**
+
+**Please cite this paper when using the code.**
 
 Below is a short guide to the data used, and for reproducing the training and testing.
 
@@ -14,6 +16,8 @@ Shape constants for the input data are defined in `CONSTANTS.py`.
 **Output:** Modis albedo
 
 ### Data used in this study
+Sample data is in the 'data' folder.
+
 **Input:** Daily climatic values, as well as overall climatic and topographic characteristics for each MODIS grid cell, including:
 - Day of year
 - $T_{t_{0}}$, $T_{t_{-1}}$, $T_{t_{-2}}$, $T_{t_{-3}}$, $T_{t_{-4}}$ and $T_{t_{-5}}$: 2m-temperature, including lags of up to 5 days
