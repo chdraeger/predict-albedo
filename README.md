@@ -1,7 +1,9 @@
 # Predict mountain glacier albedo values
 ### Train, validate and test neural network models for albedo prediction with MODIS data
 
-Code for the albedo prediction in the study of Draeger, C. and Radic, V. (2025), *The Energy Balance Behind Glacier Retreat: A Regional Reconstruction for Western Canada (1980–2022)* **(under review)**
+Code for the albedo prediction in the study:
+
+Draeger, C., & Radić, V. (2026). The energy balance behind glacier retreat: A regional reconstruction for Western Canada (1980–2022). Journal of Geophysical Research: Earth Surface, 131, e2025JF008740. https://doi.org/10.1029/2025JF008740
 
 *Please cite this paper when using this code.*
 
